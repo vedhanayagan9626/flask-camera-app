@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Camera App</title>
+</head>
+<body>
+  <h1>Camera Access Demo</h1>
+  <video id="video" width="640" height="480" autoplay></video>
+  <br>
+  <button onclick="capture()">Capture</button>
+  <canvas id="canvas" width="640" height="480" style="display: none;"></canvas>
+
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(stream => {
+        video.srcObject = stream;
+      })
+      .catch(err => {
+        console.error("Camera access error:", err);
+      });
+
+    function capture() {
+      const context = canvas.getContext('2d');
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imageData = canvas.toDataURL('image/png');
+
+      fetch('/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'image=' + encodeURIComponent(imageData)
+      }).then(res => res.text()).then(data => {
+        alert(data);
+      });
+    }
+  </script>
+</body>
+</html>
