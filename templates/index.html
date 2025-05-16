@@ -1,40 +1,108 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Camera App</title>
+  <meta charset="UTF-8">
+  <title>Responsive Camera App</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link 
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" 
+    rel="stylesheet">
 </head>
-<body>
-  <h1>Camera Access Demo</h1>
-  <video id="video" width="640" height="480" autoplay></video>
-  <br>
-  <button onclick="capture()">Capture</button>
-  <canvas id="canvas" width="640" height="480" style="display: none;"></canvas>
+<body class="p-3">
+  <div class="container text-center">
+    <h2 class="mb-4">📷 Camera Capture</h2>
+
+    <select id="cameraSelect" class="form-select mb-3" onchange="switchCamera()">
+      <option value="">Select Camera</option>
+    </select>
+
+    <video id="video" autoplay playsinline class="border" width="100%"></video>
+    <br><br>
+    <button class="btn btn-primary" onclick="capture()">Capture</button>
+
+    <canvas id="canvas" width="640" height="480" style="display: none;"></canvas>
+  </div>
 
   <script>
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
+    const cameraSelect = document.getElementById('cameraSelect');
+    let currentStream = null;
 
-    navigator.mediaDevices.getUserMedia({ video: true })
-      .then(stream => {
-        video.srcObject = stream;
-      })
-      .catch(err => {
-        console.error("Camera access error:", err);
+    // List available cameras
+    async function getCameras() {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(d => d.kind === 'videoinput');
+
+      cameraSelect.innerHTML = '';
+      videoDevices.forEach((device, index) => {
+        const option = document.createElement('option');
+        option.value = device.deviceId;
+        option.text = device.label || `Camera ${index + 1}`;
+        cameraSelect.appendChild(option);
       });
+
+      if (videoDevices.length > 0) {
+        cameraSelect.value = videoDevices[0].deviceId;
+        startStream(videoDevices[0].deviceId);
+      }
+    }
+
+    // Start stream with selected device
+    async function startStream(deviceId) {
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+      }
+
+      try {
+        const constraints = {
+          video: {
+            deviceId: { exact: deviceId }
+          }
+        };
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = stream;
+        currentStream = stream;
+      } catch (err) {
+        console.error('Error accessing camera:', err);
+      }
+    }
+
+    function switchCamera() {
+      const deviceId = cameraSelect.value;
+      if (deviceId) {
+        startStream(deviceId);
+      }
+    }
 
     function capture() {
-      const context = canvas.getContext('2d');
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const imageData = canvas.toDataURL('image/png');
+  const context = canvas.getContext('2d');
+  context.drawImage(video, 0, 0, canvas.width, canvas.height);
+  const imageData = canvas.toDataURL('image/png');
 
-      fetch('/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'image=' + encodeURIComponent(imageData)
-      }).then(res => res.text()).then(data => {
-        alert(data);
-      });
-    }
+  // Send image to backend
+fetch('/upload', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ image: imageData })
+})
+.then(res => res.text())
+.then(data => {
+  alert(data);
+});
+
+
+  // Create a temporary link to trigger image download
+  const link = document.createElement('a');
+  link.href = imageData;
+  link.download = 'captured_image.png';  // default filename
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+
+    getCameras();
   </script>
 </body>
 </html>
